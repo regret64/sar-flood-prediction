@@ -6,10 +6,6 @@ numpy
 requests
 opencv-python
 tifffile
-rasterio
 pyproj
-geopandas
-shapely
-fiona
 segmentation-models-pytorch
 gunicorn
