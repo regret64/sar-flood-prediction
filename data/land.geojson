@@ -1,0 +1,21 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": { "name": "Approx India Box" },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [68.0, 6.0],
+            [88.0, 6.0],
+            [88.0, 37.0],
+            [68.0, 37.0],
+            [68.0, 6.0]
+          ]
+        ]
+      }
+    }
+  ]
+}

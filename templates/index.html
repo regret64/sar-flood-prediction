@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Flood Prediction System</title>
+
+    <!-- Leaflet -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f4f6f9;
+        }
+
+        header {
+            background: #1565c0;
+            color: white;
+            padding: 15px;
+            text-align: center;
+            font-size: 22px;
+            font-weight: bold;
+        }
+
+        .container {
+            padding: 20px;
+        }
+
+        .controls {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            box-shadow: 0px 2px 8px rgba(0,0,0,0.1);
+        }
+
+        button {
+            background: #1565c0;
+            color: white;
+            border: none;
+            padding: 10px 18px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        button:hover {
+            background: #0d47a1;
+        }
+
+        #map {
+            height: 500px;
+            border-radius: 10px;
+        }
+
+        /* Loading Spinner */
+        #loading {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0px 2px 10px rgba(0,0,0,0.2);
+            text-align: center;
+        }
+
+        .spinner {
+            border: 5px solid #eee;
+            border-top: 5px solid #1565c0;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: auto;
+        }
+
+        @keyframes spin {
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Legend */
+        .legend {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: white;
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: 0px 2px 6px rgba(0,0,0,0.2);
+            font-size: 14px;
+        }
+
+        .legend div {
+            margin-bottom: 5px;
+        }
+
+        .box {
+            display: inline-block;
+            width: 15px;
+            height: 15px;
+            margin-right: 5px;
+        }
+
+        .flood { background: red; }
+        .box.high { background: #b71c1c; }
+        .box.med { background: #ef6c00; }
+        .box.low { background: #2e7d32; }
+        .legend { z-index: 1000; }
+
+        /* Results panel */
+        .results {
+            position: absolute;
+            top: 80px;
+            right: 20px;
+            width: 320px;
+            max-height: 70vh;
+            overflow-y: auto;
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 6px 18px rgba(0,0,0,0.15);
+            font-size: 14px;
+            z-index: 1000;
+        }
+
+        .risk-high { color: #b71c1c; font-weight: 700; }
+        .risk-medium { color: #ef6c00; font-weight: 700; }
+        .risk-low { color: #2e7d32; font-weight: 700; }
+
+        .result-row { margin-bottom: 8px; }
+        .result-key { color: #555; display:block; font-size:12px }
+        .result-value { font-size:16px; }
+    </style>
+</head>
+
+<body>
+
+<header>
+    🌊 Flood Prediction System (Real-Time Demo)
+</header>
+
+<div class="container">
+
+    <div class="controls">
+        <h3>Upload Image</h3>
+        <form id="upload-form" action="/predict_upload" method="post" enctype="multipart/form-data">
+            <input type="file" name="file" id="upload-file">
+            <br>
+            <button type="submit">Run Prediction</button>
+        </form>
+
+        <p>Or click on the map to run a live prediction (no upload required).</p>
+        
+        <!-- Search Box -->
+        <div style="margin-top:15px;padding-top:15px;border-top:1px solid #eee">
+            <h4>🔍 Search Location</h4>
+            <input type="text" id="search-input" placeholder="e.g., Kerala, Assam, Mumbai" 
+                   style="width:70%;padding:8px;border:1px solid #ccc;border-radius:4px">
+            <button onclick="searchLocation()" style="padding:8px 12px">Go</button>
+            <div id="search-results" style="margin-top:5px;font-size:12px;color:#666"></div>
+        </div>
+        
+        <p style="margin-top:8px">
+            {% if model_loaded %}
+                <strong style="color:green">Model: loaded</strong>
+            {% else %}
+                <strong style="color:orange">Model: not loaded (demo mode)</strong>
+            {% endif %}
+        </p>
+    </div>
+
+    <div id="map"></div>
+
+    <div id="results" class="results" style="display:none">
+        <div id="res-alert" style="display:none;padding:8px;border-radius:6px;margin-bottom:8px;font-weight:700"></div>
+        <h4>Prediction Summary</h4>
+        <div id="res-risk" class="result-row"><span class="result-key">Risk</span><span id="res-risk-val" class="result-value"></span></div>
+        <div id="res-score" class="result-row"><span class="result-key">Score</span><span id="res-score-val" class="result-value"></span></div>
+        <div id="res-area" class="result-row"><span class="result-key">Predicted Area</span><span id="res-area-val" class="result-value"></span></div>
+        <div id="res-confidence" class="result-row"><span class="result-key">Confidence</span><span id="res-confidence-val" class="result-value"></span></div>
+        <div id="res-message" class="result-row"><span class="result-key">Message</span><div id="res-message-val"></div></div>
+        <div id="res-advice" class="result-row"><span class="result-key">Research Note</span><div id="res-advice-val"></div></div>
+        <div id="res-temp" class="result-row"><span class="result-key">Environmental (Ref Only)</span><span id="res-temp-val" class="result-value"></span></div>
+        <div id="res-humidity" class="result-row"><span class="result-key">Conditions</span><span id="res-humidity-val" class="result-value"></span></div>
+        <hr>
+        <div id="res-region" class="result-row"><span class="result-key">Region / Location</span><div id="res-region-val"></div></div>
+        <div id="res-time" class="result-row"><span class="result-key">Time</span><div id="res-time-val"></div></div>
+        <div style="margin-top:8px;text-align:right"><button id="res-close">Close</button></div>
+    </div>
+
+</div>
+
+<!-- Loading -->
+<div id="loading">
+    <div class="spinner"></div>
+    <p>Predicting...</p>
+</div>
+
+<!-- Legend -->
+<div class="legend">
+    <div><span class="box high"></span>🔴 High Risk</div>
+    <div><span class="box med"></span>🟡 Moderate Risk</div>
+    <div><span class="box low"></span>🟢 Low Risk</div>
+</div>
+
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <!-- Leaflet Draw -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-draw/dist/leaflet.draw.css" />
+    <script src="https://unpkg.com/leaflet-draw/dist/leaflet.draw.js"></script>
+
+<script>
+// Fix for Leaflet default marker icons not showing in Flask/static context
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+    iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.3/dist/images/marker-icon-2x.png',
+    iconUrl: 'https://unpkg.com/leaflet@1.9.3/dist/images/marker-icon.png',
+    shadowUrl: 'https://unpkg.com/leaflet@1.9.3/dist/images/marker-shadow.png',
+});
+
+var map = L.map('map').setView([20, 78], 5);
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+var currentGroup = null;
+var currentBase = null;
+var currentHighlight = null;
+var currentLayer = null;  // Added for upload handling
+var areaLayer = null;     // Added for area layer handling
+var focusCircle = null;   // Upload highlight circle
+var highlightBox = null;  // Upload highlight box
+var drawnItems = new L.FeatureGroup();
+map.addLayer(drawnItems);
+
+var drawControl = new L.Control.Draw({
+    draw: {
+        polygon: true,
+        rectangle: true,
+        circle: false,
+        marker: false,
+        polyline: false
+    },
+    edit: { featureGroup: drawnItems }
+});
+map.addControl(drawControl);
+var areaLayer;
+var clickBox;  // Click selection box
+
+// CLICK EVENT
+map.on('click', function(e) {
+    // Remove previous click box
+    if (clickBox) {
+        map.removeLayer(clickBox);
+        clickBox = null;
+    }
+
+    // Add blue rectangle to show selection area
+    var lat = e.latlng.lat;
+    var lon = e.latlng.lng;
+    var size = 0.1;  // approx area in degrees
+    
+    clickBox = L.rectangle([
+        [lat - size, lon - size],
+        [lat + size, lon + size]
+    ], {
+        color: "blue",
+        weight: 2,
+        fillOpacity: 0.1
+    }).addTo(map);
+
+    document.getElementById("loading").style.display = "block";
+
+    fetch(`/api/predict?lat=${e.latlng.lat}&lon=${e.latlng.lng}`)
+    .then(res => res.json())
+    .then(data => {
+
+        document.getElementById("loading").style.display = "none";
+
+        if (currentGroup) {
+            map.removeLayer(currentGroup);
+            currentGroup = null;
+            currentBase = null;
+            currentHighlight = null;
+        }
+        var geo = (data && data.geojson) ? data.geojson : data;
+        // detect water flag from returned geojson properties
+        var isWater = false;
+        try {
+            if (data && data.geojson && data.geojson.features && data.geojson.features.length>0) {
+                var p = data.geojson.features[0].properties || {};
+                if (p.water) isWater = true;
+            }
+        } catch(e) { isWater = false; }
+        var color = isWater ? '#1976d2' : ((data && data.risk === 'HIGH') ? '#b71c1c' : (data && data.risk === 'MEDIUM' ? '#ef6c00' : '#2e7d32'));
+        try {
+            currentBase = L.geoJSON(geo, { style: { color: color, fillColor: color, fillOpacity: 0.5 } });
+            // add highlight layer if provided
+            var highlight = (data && data.highlight_polygons) ? data.highlight_polygons : null;
+            if (highlight) {
+                currentHighlight = L.geoJSON(highlight, { style: { color: 'red', weight: 3, fillOpacity: 0.8 } });
+                currentGroup = L.featureGroup([currentBase, currentHighlight]).addTo(map);
+            } else {
+                currentGroup = L.featureGroup([currentBase]).addTo(map);
+            }
+            if (currentGroup.getBounds && currentGroup.getBounds().isValid()) {
+                map.fitBounds(currentGroup.getBounds(), { maxZoom: 13 });
+            }
+        } catch (e) {
+            // if geo is not valid GeoJSON, attempt to add directly
+            try { currentBase = L.geoJSON(data).addTo(map); } catch (e2) { console.error(e2); }
+        }
+        if (typeof populateResults === 'function') populateResults(data, e.latlng);
+
+    })
+    .catch(() => {
+        document.getElementById("loading").style.display = "none";
+        alert("Prediction failed");
+    });
+});
+
+// When user draws an area
+map.on(L.Draw.Event.CREATED, function (e) {
+    var layer = e.layer;
+    drawnItems.addLayer(layer);
+
+    document.getElementById("loading").style.display = "block";
+
+    var coords = layer.getLatLngs();
+
+    fetch('/predict_area', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ coords: coords })
+    })
+    .then(res => res.json())
+    .then(data => {
+        document.getElementById("loading").style.display = "none";
+        showResults(data, layer.getBounds().getCenter());
+    }).catch(err => {
+        document.getElementById("loading").style.display = "none";
+        console.error(err);
+        alert('Area prediction failed');
+    });
+});
+
+function showResults(data, center) {
+    if (currentLayer) map.removeLayer(currentLayer);
+    if (areaLayer) map.removeLayer(areaLayer);
+
+    if (data && data.geojson) {
+        // base flood layer
+        var base = L.geoJSON(data.geojson, { style: { color: 'orange', fillOpacity: 0.4 } });
+        // highlight intense zones if available
+        var highlight = (data && data.highlight_polygons) ? data.highlight_polygons : null;
+        var group;
+        if (highlight) {
+            var high = L.geoJSON(highlight, { style: { color: 'red', weight: 3, fillOpacity: 0.8 } });
+            group = L.featureGroup([base, high]).addTo(map);
+        } else {
+            group = L.featureGroup([base]).addTo(map);
+        }
+        try { map.fitBounds(group.getBounds(), { maxZoom: 13 }); } catch (e) {}
+        currentGroup = group;
+        currentBase = base;
+        currentHighlight = highlight ? high : null;
+    }
+    var popupContent = '<b>Flood Prediction</b><br>' +
+        '🌡 Temp: ' + (data.temp !== null ? data.temp + ' °C' : 'N/A') + '<br>' +
+        '💧 Humidity: ' + (data.humidity !== null ? data.humidity + ' %' : 'N/A');
+
+    L.popup().setLatLng(center || map.getCenter()).setContent(popupContent).openOn(map);
+}
+
+// Intercept upload form submit and run AJAX prediction to auto-zoom
+document.getElementById('upload-form').addEventListener('submit', function(ev) {
+    ev.preventDefault();
+    var fileInput = document.getElementById('upload-file');
+    if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+        alert('Please select a file to upload');
+        return;
+    }
+    var fd = new FormData();
+    fd.append('file', fileInput.files[0]);
+
+    document.getElementById("loading").style.display = "block";
+
+    fetch('/predict_upload', { method: 'POST', body: fd })
+        .then(r => {
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return r.json();
+        })
+        .then(data => {
+            console.log("UPLOAD RESPONSE:", data);
+            document.getElementById("loading").style.display = "none";
+            if (currentLayer) map.removeLayer(currentLayer);
+            var geo = (data && data.geojson) ? data.geojson : data;
+            try {
+                currentLayer = L.geoJSON(geo, { style: { color: '#b71c1c', fillOpacity: 0.5 } }).addTo(map);
+                // Use bounds from response or fallback to geojson bounds
+                if (data.bounds) {
+                    map.fitBounds(data.bounds);
+                } else if (currentLayer.getBounds && currentLayer.getBounds().isValid()) {
+                    map.fitBounds(currentLayer.getBounds());
+                }
+                // Add red highlight circle at center (with popup)
+                if (data.center && data.center[0] && data.center[1]) {
+                    let centerLat = data.center[0];
+                    let centerLon = data.center[1];
+                    
+                    // Remove previous highlights
+                    if (focusCircle) { map.removeLayer(focusCircle); focusCircle = null; }
+                    if (highlightBox) { map.removeLayer(highlightBox); highlightBox = null; }
+                    
+                    // Add yellow outline box
+                    highlightBox = L.rectangle([
+                        [centerLat - 0.3, centerLon - 0.3],
+                        [centerLat + 0.3, centerLon + 0.3]
+                    ], {
+                        color: "yellow",
+                        weight: 2,
+                        fillOpacity: 0
+                    }).addTo(map);
+                    
+                    // Add red highlight circle
+                    focusCircle = L.circle([centerLat, centerLon], {
+                        radius: 50000,
+                        color: "red",
+                        fillOpacity: 0.3
+                    }).addTo(map);
+                    
+                    // Add popup with info
+                    focusCircle.bindPopup(
+                        `📍 Predicted Area<br>
+                         Risk: <b>${data.risk}</b><br>
+                         Confidence: <b>${data.confidence}%</b>`
+                    ).openPopup();
+                    
+                    map.setView([centerLat, centerLon], 7);
+                }
+            } catch (e) { console.error(e); }
+            if (typeof populateResults === 'function') populateResults(data, map.getCenter());
+        }).catch(err => {
+            document.getElementById("loading").style.display = "none";
+            console.error("Upload error:", err);
+            // Don't show popup - just log it
+            // alert('Upload prediction failed');
+        });
+});
+
+// Results helper and upload handling
+function populateResults(data, center) {
+    if (!data) return;
+    var results = document.getElementById('results');
+    if (!results) return;
+    results.style.display = 'block';
+    var riskEl = document.getElementById('res-risk-val');
+    var scoreEl = document.getElementById('res-score-val');
+    var areaEl = document.getElementById('res-area-val');
+    var confEl = document.getElementById('res-confidence-val');
+    var msgEl = document.getElementById('res-message-val');
+    var advEl = document.getElementById('res-advice-val');
+    var regionEl = document.getElementById('res-region-val');
+    var timeEl = document.getElementById('res-time-val');
+
+    var risk = data.risk || 'LOW';
+    var riskEmoji = risk === 'HIGH' ? '🔴' : risk === 'MEDIUM' ? '🟡' : '🟢';
+    riskEl.innerHTML = `Risk Level: ${riskEmoji} ${risk}`;
+    riskEl.className = `result-value risk-${risk.toLowerCase()}`;
+
+    scoreEl.innerHTML = `Score: ${(data.score || 0).toFixed(2)}`;
+    areaEl.textContent = (data.area !== undefined) ? data.area + ' pixels' : (data.area_pct !== undefined) ? data.area_pct + ' % of image' : 'N/A';
+    confEl.innerHTML = `Confidence: ${(data.confidence || 0).toFixed(0)}%`;
+
+    // Add Peak Intensity if available
+    var peakVal = (data.max_prob || 0).toFixed(2);
+    var peakEl = document.getElementById('res-peak-val');
+    if (!peakEl) {
+        var peakRow = document.createElement('div');
+        peakRow.id = 'res-peak-row';
+        peakRow.className = 'result-row';
+        peakRow.innerHTML = '<span class="result-key">Peak Intensity</span><span id="res-peak-val" class="result-value"></span>';
+        confEl.parentNode.parentNode.insertBefore(peakRow, confEl.parentNode.nextSibling);
+        peakEl = document.getElementById('res-peak-val');
+    }
+    peakEl.textContent = peakVal;
+
+    msgEl.textContent = data.message || '';
+    advEl.textContent = data.advice || '';
+
+    // show temp/humidity if present
+    var tempVal = document.getElementById('res-temp-val');
+    var humVal = document.getElementById('res-humidity-val');
+    var temp = data.temperature !== undefined ? data.temperature : (data.temp || 'N/A');
+    var hum = data.humidity !== undefined ? data.humidity : (data.hum || 'N/A');
+    if (temp !== 'N/A' && temp !== null) tempVal.textContent = temp + ' °C'; else tempVal.textContent = 'N/A';
+    if (hum !== 'N/A' && hum !== null) humVal.textContent = hum + ' %'; else humVal.textContent = 'N/A';
+
+    // alert banner for high risk
+    var alertEl = document.getElementById('res-alert');
+    if (risk === 'HIGH') {
+        alertEl.style.display = 'block';
+        alertEl.style.background = '#ffebee';
+        alertEl.style.color = '#b71c1c';
+        alertEl.textContent = 'HIGH RISK — Take immediate precautions!';
+    } else if (risk === 'MEDIUM') {
+        alertEl.style.display = 'block';
+        alertEl.style.background = '#fff3e0';
+        alertEl.style.color = '#ef6c00';
+        alertEl.textContent = 'Moderate risk — Be alert.';
+    } else {
+        alertEl.style.display = 'none';
+    }
+
+    var lat = (center && center.lat !== undefined) ? center.lat.toFixed(5) : 'N/A';
+    var lon = (center && center.lng !== undefined) ? center.lng.toFixed(5) : 'N/A';
+    regionEl.innerHTML = 'Lat: ' + lat + ' &nbsp; Lon: ' + lon;
+    timeEl.textContent = new Date().toLocaleString();
+
+    if (data.geojson) {
+        var blob = new Blob([JSON.stringify(data.geojson)], {type: 'application/json'});
+        var url = URL.createObjectURL(blob);
+        var link = document.getElementById('res-download');
+        if (!link) {
+            link = document.createElement('a');
+            link.id = 'res-download';
+            link.textContent = 'Download GeoJSON';
+            link.style.display = 'block';
+            link.style.marginTop = '8px';
+            results.appendChild(link);
+        }
+        link.href = url; link.download = 'prediction.geojson';
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function(){
+    var closeBtn = document.getElementById('res-close');
+    if (closeBtn) closeBtn.addEventListener('click', function(){ document.getElementById('results').style.display='none'; });
+
+    var uploadForm = document.querySelector('form[action="/predict_upload"]');
+    if (uploadForm) {
+        uploadForm.addEventListener('submit', function(ev){
+            ev.preventDefault();
+            var fd = new FormData(uploadForm);
+            document.getElementById("loading").style.display = "block";
+            fetch('/predict_upload', { method: 'POST', body: fd })
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById("loading").style.display = "none";
+                if (data.error) { alert('Error: '+(data.detail||data.error)); return; }
+                try { showResults(data, map.getCenter()); } catch(e){ console.error(e); }
+            }).catch(err => {
+                document.getElementById("loading").style.display = "none";
+                console.error(err); alert('Upload failed');
+            });
+        });
+    }
+});
+
+// ---- SEARCH LOCATION FUNCTION ----
+function searchLocation() {
+    var input = document.getElementById('search-input');
+    var query = input.value.trim();
+    if (!query) return;
+    
+    var resultsDiv = document.getElementById('search-results');
+    resultsDiv.innerHTML = 'Searching...';
+    
+    // Demo locations for common flood-prone areas (specific sub-regions)
+    var locations = {
+        // HIGH Risk - Specific flood zones
+        'malabar': { lat: 10.0, lon: 76.4, zoom: 9, label: 'Malabar Coast (HIGH)' },
+        'kasaragod': { lat: 11.0, lon: 75.8, zoom: 10, label: 'Kasaragod (HIGH)' },
+        'brahmaputra': { lat: 26.4, lon: 91.0, zoom: 9, label: 'Brahmaputra Floodplain (HIGH)' },
+        'barak': { lat: 26.0, lon: 92.0, zoom: 9, label: 'Barak Basin (HIGH)' },
+        'kosi': { lat: 25.8, lon: 86.8, zoom: 9, label: 'Kosi Basin (HIGH)' },
+        'gandak': { lat: 26.2, lon: 85.8, zoom: 9, label: 'Gandak Area (HIGH)' },
+        
+        // MEDIUM Risk
+        'mahanadi': { lat: 20.8, lon: 86.8, zoom: 9, label: 'Mahanadi Delta (MEDIUM)' },
+        'chilika': { lat: 19.8, lon: 85.4, zoom: 10, label: 'Chilika Region (MEDIUM)' },
+        'godavari': { lat: 18.0, lon: 81.8, zoom: 9, label: 'Godavari Delta (MEDIUM)' },
+        'krishna': { lat: 16.0, lon: 80.8, zoom: 9, label: 'Krishna Delta (MEDIUM)' },
+        'sundarbans': { lat: 22.0, lon: 88.8, zoom: 9, label: 'Sundarbans (MEDIUM)' },
+        'hooghly': { lat: 23.0, lon: 87.8, zoom: 9, label: 'Hooghly Basin (MEDIUM)' },
+        'narmada': { lat: 21.8, lon: 72.8, zoom: 9, label: 'Narmada Lower (MEDIUM)' },
+        'tapi': { lat: 21.3, lon: 73.8, zoom: 9, label: 'Tapi Basin (MEDIUM)' },
+        
+        // LOW Risk / Safe zones
+        'bikaner': { lat: 28.0, lon: 73.2, zoom: 9, label: 'Bikaner (LOW)' },
+        'mahabaleshwar': { lat: 15.8, lon: 73.8, zoom: 10, label: 'Western Ghats (LOW)' },
+        'chennai': { lat: 13.0, lon: 80.2, zoom: 10, label: 'Chennai Coast (LOW)' },
+        'himachal': { lat: 32.0, lon: 77.0, zoom: 8, label: 'Himachal (LOW)' },
+        
+        // Major cities (safe)
+        'mumbai': { lat: 19.0, lon: 72.8, zoom: 10, label: 'Mumbai (Safe)' },
+        'delhi': { lat: 28.6, lon: 77.2, zoom: 10, label: 'Delhi (Safe)' },
+        'bangalore': { lat: 12.9, lon: 77.5, zoom: 10, label: 'Bangalore (Safe)' },
+        'hyderabad': { lat: 17.4, lon: 78.4, zoom: 10, label: 'Hyderabad (Safe)' },
+        'kolkata': { lat: 22.5, lon: 88.3, zoom: 10, label: 'Kolkata (Safe)' },
+        
+        // Legacy names (redirect to specific areas)
+        'kerala': { lat: 10.5, lon: 76.0, zoom: 8, label: 'Kerala Region' },
+        'assam': { lat: 26.0, lon: 91.0, zoom: 8, label: 'Assam Region' },
+        'odisha': { lat: 21.5, lon: 87.0, zoom: 8, label: 'Odisha Region' },
+        'andhra': { lat: 18.5, lon: 81.0, zoom: 8, label: 'Andhra Region' },
+        'bihar': { lat: 25.8, lon: 86.0, zoom: 8, label: 'Bihar Region' },
+        'gujarat': { lat: 22.0, lon: 72.5, zoom: 7, label: 'Gujarat Region' },
+        'west bengal': { lat: 22.5, lon: 88.0, zoom: 8, label: 'West Bengal' },
+        'rajasthan': { lat: 27.0, lon: 73.0, zoom: 6, label: 'Rajasthan' },
+        'tamil nadu': { lat: 11.5, lon: 78.0, zoom: 7, label: 'Tamil Nadu' },
+        'maharashtra': { lat: 19.5, lon: 76.0, zoom: 6, label: 'Maharashtra' },
+        'india': { lat: 20.0, lon: 78.0, zoom: 5, label: 'India' }
+    };
+    
+    var q = query.toLowerCase();
+    var found = null;
+    
+    // Check exact match first
+    if (locations[q]) {
+        found = locations[q];
+    } else {
+        // Check partial match
+        for (var key in locations) {
+            if (key.includes(q) || q.includes(key)) {
+                found = locations[key];
+                break;
+            }
+        }
+    }
+    
+    if (found) {
+        map.setView([found.lat, found.lon], found.zoom);
+        resultsDiv.innerHTML = '✅ Found: ' + (found.label || query) + ' — click on map to predict';
+        // Add a marker with label
+        L.marker([found.lat, found.lon]).addTo(map).bindPopup(found.label || query).openPopup();
+    } else {
+        resultsDiv.innerHTML = '⚠️ Not found. Try: Malabar, Kosi, Mahanadi, Sundarbans, Mumbai, Delhi, etc.';
+    }
+}
+
+// Allow Enter key to search
+document.getElementById('search-input').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+        searchLocation();
+    }
+});
+</script>
+
+</body>
+</html>

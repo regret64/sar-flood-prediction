@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Flood Precautions & Details</title>
+  <style>
+    body{font-family:Arial,Helvetica,sans-serif;background:#f4f6f9;margin:0}
+    header{background:#1565c0;padding:18px;color:#fff;text-align:center}
+    .wrap{max-width:980px;margin:24px auto;padding:18px;background:#fff;border-radius:8px}
+    h2{color:#1565c0}
+    ul{line-height:1.6}
+    .danger{color:#b71c1c;font-weight:700}
+  </style>
+</head>
+<body>
+  <header><h1>Precautions & Operational Guidance</h1></header>
+  <div class="wrap">
+    <h2>Interpreting Model Output</h2>
+    <p>The model outputs a probability map and a summary risk score. Use these guidelines:</p>
+    <ul>
+      <li><strong>HIGH</strong> — Immediate action recommended. Expect significant flooding; follow local evacuation orders.</li>
+      <li><strong>MEDIUM</strong> — Monitor conditions; prepare to move to safety if advised.</li>
+      <li><strong>LOW</strong> — No immediate flooding indicated, but keep monitoring official sources.</li>
+    </ul>
+
+    <h2>Practical Precautions</h2>
+    <ul>
+      <li class="danger">Avoid driving through flooded roads — six inches of water can stall a car.</li>
+      <li>Move important documents and electronics to higher ground.</li>
+      <li>Follow local emergency services and official weather alerts.</li>
+      <li>Do not attempt to swim or wade through fast-moving water.</li>
+    </ul>
+
+    <h2>Limitations</h2>
+    <ul>
+      <li>Model accuracy depends on SAR preprocessing and sensor calibration.</li>
+      <li>Georeferencing errors in input images will affect overlay placement.</li>
+      <li>This tool provides probabilistic outputs and should be used with caution.</li>
+    </ul>
+
+    <h2>Further Work</h2>
+    <p>Options to improve operational readiness include automated alerting, integration with local hydrological gauges, and multi-temporal change detection.</p>
+
+    <p><a href="/map">Back to Map</a></p>
+  </div>
+</body>
+</html>

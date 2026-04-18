@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>Flood Prediction - Home</title>
+    <style>
+        body{font-family:Arial,Helvetica,sans-serif;margin:0;background:#f7f9fc;color:#222}
+        header{background:#1565c0;color:#fff;padding:20px;text-align:center}
+        .content{max-width:900px;margin:30px auto;padding:20px;background:#fff;border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,0.06)}
+        a.btn{display:inline-block;padding:10px 14px;background:#1565c0;color:#fff;border-radius:6px;text-decoration:none}
+        footer{padding:16px;text-align:center;color:#666}
+    </style>
+</head>
+<body>
+<header>
+    <h1>Flood Prediction using SAR Imagery</h1>
+</header>
+<div class="content">
+    <h2>About</h2>
+    <p>This project performs flood detection using Synthetic Aperture Radar (SAR) imagery. SAR is ideal for flood mapping because it can "see" through clouds and during night-time, providing reliable water extent estimates.</p>
+
+    <h2>How it works</h2>
+    <ol>
+        <li>Upload a georeferenced SAR GeoTIFF or click a location on the map.</li>
+        <li>The model analyzes radar backscatter to segment potential flooded areas.</li>
+        <li>The backend converts predicted mask regions into GeoJSON and computes risk statistics.</li>
+    </ol>
+
+    <h2>Disclaimer</h2>
+    <p>This system is provided for research and demonstration only. Predictions are probabilistic and should <strong>not</strong> be used as the sole basis for life-or-death decisions. Validate with authoritative local sources and official warnings.</p>
+
+    <h2>Try the app</h2>
+    <p><a class="btn" href="/map">Open Map & Predictions</a> &nbsp; <a class="btn" href="/details">Precautions & Details</a></p>
+</div>
+<footer>
+    <small>For research use only. Contact the project owner for commercial or operational use.</small>
+</footer>
+</body>
+</html>

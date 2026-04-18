@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+*.egg-info/
+dist/
+build/
+
+# ML Models
+*.pth
+*.pt
+*.onnx
+models/
+data/*.pth
+
+# Uploads
+uploads/*
+!uploads/.gitkeep
+
+# Data
+data/*.zip
+data/ne_10m_land/*
+!data/.gitkeep
+
+# Environment
+.env
+.env.local
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
