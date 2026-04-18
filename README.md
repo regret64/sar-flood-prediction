@@ -10,9 +10,8 @@ A research-based flood detection and risk assessment system using Synthetic Aper
 
 ## 👥 Authors
 
-- **Author 1** - [GitHub Profile]
-- **Author 2** - [GitHub Profile]  
-- **Author 3** - [GitHub Profile]
+- **Main Author:** [J RISHIKESH](https://github.com/regret64)
+- **Co-Author:** [G K SAINIMAL](https://github.com/gksnabc)
 
 ---
 
