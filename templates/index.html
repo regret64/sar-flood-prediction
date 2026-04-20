@@ -538,25 +538,6 @@ function populateResults(data, center) {
 document.addEventListener('DOMContentLoaded', function(){
     var closeBtn = document.getElementById('res-close');
     if (closeBtn) closeBtn.addEventListener('click', function(){ document.getElementById('results').style.display='none'; });
-
-    var uploadForm = document.querySelector('form[action="/predict_upload"]');
-    if (uploadForm) {
-        uploadForm.addEventListener('submit', function(ev){
-            ev.preventDefault();
-            var fd = new FormData(uploadForm);
-            document.getElementById("loading").style.display = "block";
-            fetch('/predict_upload', { method: 'POST', body: fd })
-            .then(res => res.json())
-            .then(data => {
-                document.getElementById("loading").style.display = "none";
-                if (data.error) { alert('Error: '+(data.detail||data.error)); return; }
-                try { showResults(data, map.getCenter()); } catch(e){ console.error(e); }
-            }).catch(err => {
-                document.getElementById("loading").style.display = "none";
-                console.error(err); alert('Upload failed');
-            });
-        });
-    }
 });
 
 // ---- SEARCH LOCATION FUNCTION ----
