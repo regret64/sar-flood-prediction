@@ -735,10 +735,23 @@ def predict_upload():
             transform = [1, 0, 0, 0, 1, 0]  # dummy transform
 
         print("✅ Image read:", image.shape)
+        orig_h, orig_w = image.shape[:2]
 
         # ---- PREPROCESS ----
         image = cv2.resize(image, (256, 256))
         image = image / 255.0
+
+        # Build a rescaled transform so that 256x256 mask maps to the full geo-extent
+        # Original transform maps (col, row) in original pixel space -> (lon, lat)
+        # We need to scale it so (col, row) in 256x256 space -> (lon, lat)
+        sx = orig_w / 256.0
+        sy = orig_h / 256.0
+        # Affine: lon = a*col + b*row + c,  lat = d*col + e*row + f
+        # Rescale: new_a = a*sx, new_b = b*sy, new_d = d*sx, new_e = e*sy  (c,f unchanged)
+        scaled_transform = [
+            float(transform[0]) * sx, float(transform[1]) * sy, float(transform[2]),
+            float(transform[3]) * sx, float(transform[4]) * sy, float(transform[5]),
+        ]
 
         image = np.expand_dims(image, axis=0)  # (1,256,256)
         image = np.expand_dims(image, axis=0)  # (1,1,256,256)
@@ -787,16 +800,16 @@ def predict_upload():
         # Create binary mask for flooded areas
         binary_mask = (prob > 0.5).astype(np.uint8)
         
-        # Use the transform from the image
-        if transform is None:
-            transform = [1, 0, 0, 0, 1, 0]
+        # Use the scaled transform (maps 256x256 mask to full geo-extent)
+        if scaled_transform is None:
+            scaled_transform = [1, 0, 0, 0, 1, 0]
         
         # Convert mask to GeoJSON polygons
-        geojson = mask_to_geojson(binary_mask, transform)
+        geojson = mask_to_geojson(binary_mask, scaled_transform)
         
         # Create highlight layer for high-intensity areas
         high_mask = (prob > 0.7).astype(np.uint8)
-        highlight_polygons = mask_to_geojson(high_mask, transform)
+        highlight_polygons = mask_to_geojson(high_mask, scaled_transform)
 
         # ---- COMPUTE BOUNDS AND CENTER ----
         bounds = None
@@ -804,15 +817,16 @@ def predict_upload():
         center_lon = None
         try:
             h, w = prob.shape
-            # Transform corners: (col, row) -> (lon, lat)
-            left = transform[0] * 0 + transform[1] * 0 + transform[2]
-            top = transform[3] * 0 + transform[4] * 0 + transform[5]
-            right = transform[0] * w + transform[1] * h + transform[2]
-            bottom = transform[3] * w + transform[4] * h + transform[5]
+            # Transform corners using scaled_transform: (col, row) -> (lon, lat)
+            left = scaled_transform[0] * 0 + scaled_transform[1] * 0 + scaled_transform[2]
+            top = scaled_transform[3] * 0 + scaled_transform[4] * 0 + scaled_transform[5]
+            right = scaled_transform[0] * w + scaled_transform[1] * h + scaled_transform[2]
+            bottom = scaled_transform[3] * w + scaled_transform[4] * h + scaled_transform[5]
             bounds = [[bottom, left], [top, right]]
             # Center point
             center_lon = (left + right) / 2
             center_lat = (top + bottom) / 2
+            print(f"✅ Bounds: {bounds}, Center: [{center_lat}, {center_lon}]")
         except Exception as e:
             print("Bounds error:", e)
             bounds = None
