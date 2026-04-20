@@ -22,3 +22,7 @@ Thumbs.db
 # Temp uploads
 temp_upload.tif
 uploads/
+
+# Private keys - NEVER commit
+*.pem
+*.key
