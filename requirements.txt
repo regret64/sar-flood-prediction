@@ -3,17 +3,9 @@ torch
 torchvision
 folium
 numpy
-
-# Optional: needed to recreate model architecture when only `state_dict` is saved
-segmentation-models-pytorch
-opencv-python
 requests
-tifffile
-rasterio
+opencv-python
 tifffile
 pyproj
-
-tifffile
-geopandas
-shapely
-fiona
+segmentation-models-pytorch
+gunicorn
